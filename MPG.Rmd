@@ -1,0 +1,73 @@
+---
+title: "Miles per Gallon"
+author: "Alexander Alexandrov"
+output: pdf_document
+mode: selfcontained
+---
+
+# Overview
+
+Work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+* "Is an automatic or manual transmission better for MPG?"
+* "Quantify the MPG difference between automatic and manual transmissions"
+
+Its evident from my experience that *transimission type* is not the only variable that has impact on *mpg*. So several models should be analized and compared to each over. Following parameters should be considered:
+
+* Transmission type
+* Weight
+* Gross horsepower
+* Number of cylinders
+* Number of forward gears
+
+Some of them are correlated. To exclude injurious effect residuals's analisys should be made.
+
+\newpage
+
+# Motor Trend Cars Data Overview
+
+Load Motor Trend cars data. And adjust some variables.
+
+```{r}
+library(data.table)
+data(mtcars)
+data <- data.table(mtcars)
+invisible({
+    data[, vs := factor(vs)]
+    data[, am := factor(am)]
+    data[, cyl := factor(cyl)]
+    data[, gear := factor(gear)]
+});
+str(data)
+```
+
+Data is clean enough.
+
+|Variable|Type|Domain|Description|
+|---|---|---|---|
+|**mpg**|numeric|positive real number|Miles/(US) gallon|
+|**cyl**|factor|4, 6, 8|Number of cylinders|
+|**disp**|numeric|positive real number|Displacement (cu.in.)|
+|**hp**|numeric|positive real number|Gross horsepower|
+|**drat**|numeric|positive real number|Rear axle ratio|
+|**wt**|numeric|positive real number|Weight (lb/1000)|
+|**qsec**|numeric|positive real number|1/4 mile time|
+|**vs**|factor|0, 1|V/S|
+|**am**|factor|0, 1|Transmission (0 = automatic, 1 = manual)|
+|**gear**|factor|3, 4, 5|Number of forward gears|
+|**carb**|numeric|positive integer number|Number of carburetors|
+
+\newpage
+
+# Further exploratory data analyses
+
+Some usefull plots.
+
+```{r}
+library(ggplot2)
+
+```
+
+According to quantiles (boxplots) orange juice (red) is slightly better then ascorbic acid.
+
+\newpage
