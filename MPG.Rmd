@@ -1,7 +1,9 @@
 ---
-title: "Miles per Gallon"
+title: "What type of transmission is better for the MPG"
 author: "Alexander Alexandrov"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
 mode: selfcontained
 ---
 
@@ -12,36 +14,21 @@ Work for Motor Trend, a magazine about the automobile industry. Looking at a dat
 * "Is an automatic or manual transmission better for MPG?"
 * "Quantify the MPG difference between automatic and manual transmissions"
 
-Its evident from my experience that *transimission type* is not the only variable that has impact on *mpg*. So several models should be analized and compared to each over. Following parameters should be considered:
+Its evident from my experience that *transimission type* is not the only variable that has impact on *mpg*. So several models should be analized and compared to each over. Following parameters should be considered: transmission type, weight, gross horsepower, number of cylinders, number of forward gears.
 
-* Transmission type
-* Weight
-* Gross horsepower
-* Number of cylinders
-* Number of forward gears
-
-Some of them are correlated. To exclude injurious effect residuals's analisys should be made.
-
-\newpage
-
-# Motor Trend Cars Data Overview
+# Exploratory Analysis
 
 Load Motor Trend cars data. And adjust some variables.
 
-```{r}
-library(data.table)
+```{r, echo = F}
 data(mtcars)
-data <- data.table(mtcars)
-invisible({
-    data[, vs := factor(vs)]
-    data[, am := factor(am)]
-    data[, cyl := factor(cyl)]
-    data[, gear := factor(gear)]
-});
-str(data)
+mtcars$id <- row.names(mtcars)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$am <- factor(mtcars$am)
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$gear <- factor(mtcars$gear)
+str(mtcars)
 ```
-
-Data is clean enough.
 
 |Variable|Type|Domain|Description|
 |---|---|---|---|
@@ -59,15 +46,144 @@ Data is clean enough.
 
 \newpage
 
-# Further exploratory data analyses
+# Data Cleaning
 
-Some usefull plots.
+Outliers of the *weight* variable
 
-```{r}
+```{r, echo = F, fig.height = 3}
 library(ggplot2)
 
+g <- ggplot(mtcars, aes(id, hat(wt))) + geom_point(size = 2) +
+    labs(title = "Weight Hat Values", x = "", y = "") +
+    theme(axis.text.x = element_text(angle = -45, hjust = 0))
+print(g)
 ```
 
-According to quantiles (boxplots) orange juice (red) is slightly better then ascorbic acid.
+Outliers of the *horsepower* variable
+
+```{r, echo = F, fig.height = 3}
+g <- ggplot(mtcars, aes(id, hat(hp))) + geom_point(size = 2) +
+    labs(title = "Horsepower Hat Values", x = "", y = "") +
+    theme(axis.text.x = element_text(angle = -45, hjust = 0))
+print(g)
+```
+
+The only evident outliers are: "Cadillac Fleetwood", "Chrysler Imperial", "Lincoln Continental", "Maserati Bora". This is error or extraordinary cases. And they should be removed from the data before the regression analysis to avoid injurious effect.
+
+```{r}
+mtcars <- mtcars[!(mtcars$id %in% c("Cadillac Fleetwood", "Chrysler Imperial", "Lincoln Continental", "Maserati Bora")), ]
+```
 
 \newpage
+
+# Multivariate Regression Analysis
+
+Following *nested models* will be treated against each over:
+
+```{r}
+fit <- lm(mpg ~ am, data = mtcars)
+fit.wt <- update(fit, mpg ~ am*wt)
+fit.wt.hp <- update(fit, mpg ~ am*wt + am*hp)
+anova(fit, fit.wt, fit.wt.hp)
+```
+
+According to p-values (they are less than 0.05), the best choiсe is the last and more complicated model. Lets test two additional models against the best one.
+
+```{r}
+best.fit <- lm(mpg ~ am*wt + am*hp, data = mtcars)
+fit.wt.hp.cyl <- update(best.fit, mpg ~ am*cyl*wt + am*cyl*hp)
+anova(best.fit, fit.wt.hp.cyl)
+```
+
+```{r}
+fit.wt.hp.gear <- update(best.fit, mpg ~ am*gear*wt + am*gear*hp)
+anova(best.fit, fit.wt.hp.gear)
+```
+
+Adding of the extra predictors has no sensible impact according to p-values (gerater than 0.05). So the best model remains intact.
+
+\newpage
+
+# Chosen Model Quality Analysis
+
+```{r}
+summary(best.fit)
+```
+
+R-squared is very close to the 1, thus the most variance is explained by this model. Coefficients could be interpreted as follows:
+
+1. Manual trans. intercept is greater than automatic trans. intercept by:
+```{r, echo = F}
+coeff <- best.fit$coefficients
+print(paste(round(coeff[["am1"]], 3), "MPG"))
+```
+2. Change in MPG per one thousand lb automatic vs manual:
+```{r, echo = F}
+print(paste(round(coeff[["wt"]], 3), "vs", round(coeff[["wt"]] + coeff[["am1:wt"]], 3), "MPG per 1000*lb"))
+```
+3. Change in MPG per one horsepower automatic vs manual:
+```{r, echo = F}
+print(paste(round(coeff[["hp"]], 3), "vs", round(coeff[["hp"]] + coeff[["am1:hp"]], 3), "MPG per horsepower"))
+```
+4. Also according to the p-values of the *wt* and *am1:hp* coefficients. Null hypothesis about equality to zero could *not* be rejected.
+
+\newpage
+
+# Residuals
+
+```{r, echo = F, fig.height = 3}
+par(mfrow = c(1, 2))
+plot(best.fit, c(3, 5))
+```
+
+It seems that residuals do not form a pattern. So the conclusions could be made.
+
+# Conclusions
+
+Greater MPG is better.
+
+```{r, fig.height = 2}
+ggplot(mtcars, aes(wt, mpg, color = am)) + geom_point(size = 2) +
+    geom_abline(intercept = coeff[[1]] + coeff[["hp"]] * mean(mtcars$hp),
+                slope = coeff[["wt"]], color = "red") +
+    geom_abline(intercept = coeff[[1]] + coeff[["am1"]] +
+                    (coeff[["hp"]] + coeff[["am1:hp"]]) * mean(mtcars$hp),
+                slope=coeff[["wt"]] + coeff[["am1:wt"]], color="cyan") +
+    labs(x = "Weight (lb/1000)", y = "MPG")
+```
+
+According to hypothetical relationship manual transmission is the best choice for lightwight cars, but automatic transmission is better for heavy cars. Thus nothing particular could be said. Also attention should be paid to the real points that form two clusters. Lightwieght cars with manual transmission and heavy cars with automatic transmission.
+
+```{r, fig.height = 2}
+ggplot(mtcars, aes(hp, mpg, color = am)) + geom_point(size = 2) +
+    geom_abline(intercept = coeff[[1]] + coeff[["wt"]] * mean(mtcars$wt),
+                slope = coeff[["hp"]], color = "red") +
+    geom_abline(intercept = coeff[[1]] + coeff[["am1"]] +
+                    (coeff[["wt"]] + coeff[["am1:wt"]]) * mean(mtcars$wt),
+                slope=coeff[["hp"]] + coeff[["am1:hp"]], color="cyan") +
+    labs(x = "Horsepower", y = "MPG")
+```
+
+Hypothetical relationships between MPG and horsepower in case of automatic transmission is very close to the case of manual transmission.
+
+So it's very hard to quantify the difference between automatic and manual transmission. At average they are very close to each over according to this model.
+
+Thus t-test could be useful to quantify the difference at average.
+
+```{r}
+test <- t.test(mpg ~ am, data = mtcars)
+test
+```
+
+P-value is less than 0.05, so it's statistically significant difference between automatic and manual transmissions. Manual trasmission is better than autimatic.
+And change in MPG from manual to automatic could be estimated by the following confidence interval:
+
+```{r, echo = F}
+test$conf.int
+```
+
+centered at:
+
+```{r, echo = F}
+print(paste(mean(test$conf.int), "Miles/(US) gallon"))
+```
